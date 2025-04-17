@@ -1,83 +1,93 @@
 
-import { useState, useEffect, useMemo } from "react";
-import { Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, MapPin, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { eventCategories, locations } from "@/data/mock-data";
+import { Card } from "@/components/ui/card";
 
 interface EventSearchProps {
-  onSearch: (search: string) => void;
+  onSearch: (query: string) => void;
   onCategoryChange: (category: string) => void;
   onLocationChange: (location: string) => void;
 }
 
-export function EventSearch({ onSearch, onCategoryChange, onLocationChange }: EventSearchProps) {
-  const [searchInput, setSearchInput] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+export function EventSearch({
+  onSearch,
+  onCategoryChange,
+  onLocationChange,
+}: EventSearchProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  // Categories and locations could come from API in a real app
+  const categories = ["All", "Technology", "Music", "Business", "Food & Drink", "Arts", "Sports"];
+  const locations = ["All", "Jakarta", "Surabaya", "Bandung", "Yogyakarta", "Bali"];
 
   // Debounce search input
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setDebouncedSearch(searchInput);
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
     }, 500);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchInput]);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [searchTerm]);
 
-  // Call onSearch when debouncedSearch changes
+  // Trigger search when debounced value changes
   useEffect(() => {
-    onSearch(debouncedSearch);
-  }, [debouncedSearch, onSearch]);
+    onSearch(debouncedSearchTerm);
+  }, [debouncedSearchTerm, onSearch]);
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm">
-      <h2 className="text-lg font-semibold mb-4">Find Events</h2>
-      <div className="space-y-4">
-        <div className="relative">
+    <Card className="p-4 md:p-6 shadow-md">
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute top-3 left-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search events..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-10"
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Category</label>
-            <Select onValueChange={onCategoryChange} defaultValue="All">
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {eventCategories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative">
+            <div className="absolute top-3 left-3">
+              <Tag className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <select
+              className="h-10 w-full min-w-[140px] pl-9 pr-4 rounded-md border border-input bg-background text-sm"
+              onChange={(e) => onCategoryChange(e.target.value)}
+              defaultValue="All"
+            >
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Location</label>
-            <Select onValueChange={onLocationChange} defaultValue="All">
-              <SelectTrigger>
-                <SelectValue placeholder="Select location" />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map((location) => (
-                  <SelectItem key={location} value={location}>
-                    {location}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="relative">
+            <div className="absolute top-3 left-3">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <select
+              className="h-10 w-full min-w-[140px] pl-9 pr-4 rounded-md border border-input bg-background text-sm"
+              onChange={(e) => onLocationChange(e.target.value)}
+              defaultValue="All"
+            >
+              {locations.map((location) => (
+                <option key={location} value={location}>
+                  {location}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

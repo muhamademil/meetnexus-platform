@@ -1,13 +1,15 @@
 
-import { useState } from "react";
+import React, { useState } from "react";
+import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { InputWithValidation } from "@/components/ui/input-with-validation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InputWithValidation } from "@/components/ui/input-with-validation";
 
 // Login schema
 const loginSchema = z.object({
@@ -15,29 +17,31 @@ const loginSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
 });
 
-type LoginValues = z.infer<typeof loginSchema>;
-
 // Registration schema
 const registerSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
-  confirmPassword: z.string().min(8, { message: "Password must be at least 8 characters" }),
-  role: z.enum(["customer", "organizer"]),
+  confirmPassword: z.string().min(8, { message: "Confirm password must be at least 8 characters" }),
+  role: z.enum(["customer", "organizer"], {
+    required_error: "You need to select a user type",
+  }),
   referralCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
+  message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
-type RegisterValues = z.infer<typeof registerSchema>;
+type LoginFormValues = z.infer<typeof loginSchema>;
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function AuthForms() {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<string>("login");
-
+  const [isLoginPasswordVisible, setIsLoginPasswordVisible] = useState(false);
+  const [isRegisterPasswordVisible, setIsRegisterPasswordVisible] = useState(false);
+  const [isRegisterConfirmPasswordVisible, setIsRegisterConfirmPasswordVisible] = useState(false);
+  
   // Login form
-  const loginForm = useForm<LoginValues>({
+  const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -46,7 +50,7 @@ export function AuthForms() {
   });
 
   // Register form
-  const registerForm = useForm<RegisterValues>({
+  const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: "",
@@ -58,41 +62,36 @@ export function AuthForms() {
     },
   });
 
-  const onLoginSubmit = async (data: LoginValues) => {
-    setIsLoading(true);
-    try {
-      // Login implementation would go here
-      console.log('Login data:', data);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (error) {
-      console.error('Login error:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const onLoginSubmit = async (values: LoginFormValues) => {
+    console.log("Login values", values);
+    
+    // TODO: Implement login functionality
+    
+    // Show notification for demo purposes
+    toast.success("Login successful", {
+      description: "Welcome back to MeetNexus!",
+    });
   };
 
-  const onRegisterSubmit = async (data: RegisterValues) => {
-    setIsLoading(true);
-    try {
-      // Registration implementation would go here
-      console.log('Register data:', data);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (error) {
-      console.error('Registration error:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const onRegisterSubmit = async (values: RegisterFormValues) => {
+    console.log("Register values", values);
+    
+    // TODO: Implement registration functionality
+    
+    // Show notification for demo purposes
+    toast.success("Registration successful", {
+      description: `Welcome to MeetNexus! You've registered as a${values.role === "organizer" ? "n" : ""} ${values.role}.`,
+    });
   };
 
   return (
-    <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full max-w-lg">
+    <Tabs defaultValue="login" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
         <TabsTrigger value="login">Login</TabsTrigger>
         <TabsTrigger value="register">Register</TabsTrigger>
       </TabsList>
       
+      {/* Login Form */}
       <TabsContent value="login">
         <Card>
           <CardHeader>
@@ -112,35 +111,40 @@ export function AuthForms() {
                 errors={loginForm.formState.errors}
                 required
               />
-              <InputWithValidation
-                id="password"
-                label="Password"
-                type="password"
-                placeholder="********"
-                register={loginForm.register}
-                errors={loginForm.formState.errors}
-                required
-              />
-            </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-              <p className="text-sm text-center text-muted-foreground">
-                Don't have an account?{" "}
-                <button
+              
+              <div className="relative">
+                <InputWithValidation
+                  id="password"
+                  label="Password"
+                  type={isLoginPasswordVisible ? "text" : "password"}
+                  placeholder="••••••••"
+                  register={loginForm.register}
+                  errors={loginForm.formState.errors}
+                  required
+                />
+                <Button
                   type="button"
-                  className="text-primary underline"
-                  onClick={() => setActiveTab("register")}
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-8 right-2"
+                  onClick={() => setIsLoginPasswordVisible(!isLoginPasswordVisible)}
                 >
-                  Register
-                </button>
-              </p>
+                  {isLoginPasswordVisible ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" className="w-full">Login</Button>
             </CardFooter>
           </form>
         </Card>
       </TabsContent>
-
+      
+      {/* Register Form */}
       <TabsContent value="register">
         <Card>
           <CardHeader>
@@ -159,6 +163,7 @@ export function AuthForms() {
                 errors={registerForm.formState.errors}
                 required
               />
+              
               <InputWithValidation
                 id="email"
                 label="Email"
@@ -168,67 +173,99 @@ export function AuthForms() {
                 errors={registerForm.formState.errors}
                 required
               />
-              <InputWithValidation
-                id="password"
-                label="Password"
-                type="password"
-                placeholder="********"
-                register={registerForm.register}
-                errors={registerForm.formState.errors}
-                required
-              />
-              <InputWithValidation
-                id="confirmPassword"
-                label="Confirm Password"
-                type="password"
-                placeholder="********"
-                register={registerForm.register}
-                errors={registerForm.formState.errors}
-                required
-              />
-              <div className="space-y-2">
-                <label className="text-sm font-medium">I want to register as</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <Button
-                    type="button"
-                    variant={registerForm.watch("role") === "customer" ? "default" : "outline"}
-                    onClick={() => registerForm.setValue("role", "customer")}
-                    className="w-full"
-                  >
-                    Customer
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={registerForm.watch("role") === "organizer" ? "default" : "outline"}
-                    onClick={() => registerForm.setValue("role", "organizer")}
-                    className="w-full"
-                  >
-                    Event Organizer
-                  </Button>
-                </div>
+              
+              <div className="relative">
+                <InputWithValidation
+                  id="password"
+                  label="Password"
+                  type={isRegisterPasswordVisible ? "text" : "password"}
+                  placeholder="••••••••"
+                  register={registerForm.register}
+                  errors={registerForm.formState.errors}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-8 right-2"
+                  onClick={() => setIsRegisterPasswordVisible(!isRegisterPasswordVisible)}
+                >
+                  {isRegisterPasswordVisible ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
+              
+              <div className="relative">
+                <InputWithValidation
+                  id="confirmPassword"
+                  label="Confirm Password"
+                  type={isRegisterConfirmPasswordVisible ? "text" : "password"}
+                  placeholder="••••••••"
+                  register={registerForm.register}
+                  errors={registerForm.formState.errors}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-8 right-2"
+                  onClick={() => setIsRegisterConfirmPasswordVisible(!isRegisterConfirmPasswordVisible)}
+                >
+                  {isRegisterConfirmPasswordVisible ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">
+                  I am registering as a: <span className="text-destructive">*</span>
+                </label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      value="customer"
+                      className="form-radio"
+                      {...registerForm.register("role")}
+                      defaultChecked
+                    />
+                    <span>Customer</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      value="organizer"
+                      className="form-radio"
+                      {...registerForm.register("role")}
+                    />
+                    <span>Event Organizer</span>
+                  </label>
+                </div>
+                {registerForm.formState.errors.role && (
+                  <p className="text-sm text-destructive">
+                    {registerForm.formState.errors.role.message}
+                  </p>
+                )}
+              </div>
+              
               <InputWithValidation
                 id="referralCode"
                 label="Referral Code (Optional)"
-                placeholder="Enter referral code"
+                placeholder="Enter referral code if you have one"
                 register={registerForm.register}
                 errors={registerForm.formState.errors}
               />
             </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Create account"}
-              </Button>
-              <p className="text-sm text-center text-muted-foreground">
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  className="text-primary underline"
-                  onClick={() => setActiveTab("login")}
-                >
-                  Login
-                </button>
-              </p>
+            <CardFooter>
+              <Button type="submit" className="w-full">Register</Button>
             </CardFooter>
           </form>
         </Card>

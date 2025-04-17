@@ -1,28 +1,26 @@
 
 import { useState } from "react";
+import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Clock, CreditCard, Info, Upload } from "lucide-react";
-
+import { toast } from "sonner";
+import { Clock, Upload } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { InputWithValidation } from "@/components/ui/input-with-validation";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { formatIDR } from "@/components/events/event-card";
+import { formatIDR } from "./event-card";
 
-// Payment Form Schema
+// Payment form schema
 const paymentSchema = z.object({
-  name: z.string().min(3, { message: "Name must be at least 3 characters" }),
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  phone: z.string().min(10, { message: "Phone number must be at least 10 characters" }),
   usePoints: z.boolean().default(false),
+  voucherCode: z.string().optional(),
+  paymentProof: z.any().optional(),
 });
 
-type PaymentValues = z.infer<typeof paymentSchema>;
+type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 interface PaymentFormProps {
   eventName: string;
@@ -37,244 +35,220 @@ export function PaymentForm({
   eventDate,
   totalPrice,
   quantity,
-  availablePoints = 0,
+  availablePoints,
 }: PaymentFormProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentProof, setPaymentProof] = useState<File | null>(null);
-  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({
-    hours: 2,
-    minutes: 0,
-    seconds: 0,
-  });
-
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<PaymentValues>({
+  const [countdown, setCountdown] = useState(7200); // 2 hours in seconds
+  const [isUploading, setIsUploading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  
+  // Format the countdown time
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Initialize form
+  const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
       usePoints: false,
+      voucherCode: "",
     },
   });
-
-  const usePoints = watch("usePoints");
-
-  // Calculate points to use (up to the total price)
-  const pointsToUse = usePoints ? Math.min(availablePoints, totalPrice) : 0;
   
-  // Calculate final price after points
+  // Calculate points to use (all available points up to total price)
+  const pointsToUse = form.watch("usePoints") ? Math.min(availablePoints, totalPrice) : 0;
+  
+  // Calculate final price after applying points
   const finalPrice = totalPrice - pointsToUse;
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setPaymentProof(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          setPaymentProofPreview(e.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+  
+  const onSubmit = async (values: PaymentFormValues) => {
+    console.log("Payment values", values);
+    
+    if (!file) {
+      toast.error("Please upload payment proof");
+      return;
     }
-  };
-
-  const onSubmit = async (data: PaymentValues) => {
-    setIsSubmitting(true);
-    try {
-      // In a real app, this would submit to an API
-      console.log("Payment data:", {
-        ...data,
-        pointsUsed: pointsToUse,
-        finalPrice,
-        paymentProof,
+    
+    setIsUploading(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsUploading(false);
+      
+      toast.success("Payment submitted successfully", {
+        description: "Your payment is being processed. You'll receive a notification once it's confirmed.",
       });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Navigate to success page or show success message
-      console.log("Payment successful");
-    } catch (error) {
-      console.error("Error submitting payment:", error);
-    } finally {
-      setIsSubmitting(false);
+      // In real implementation, redirect to transaction success page
+    }, 2000);
+  };
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
-
+  
   return (
-    <div>
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle>Payment Details</CardTitle>
-          <CardDescription>
-            Complete your payment within 2 hours
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert className="mb-4">
-            <Clock className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>Time remaining:</span>
-              <span className="font-semibold text-purple-600">
-                {`${timeLeft.hours.toString().padStart(2, "0")}:${timeLeft.minutes
-                  .toString()
-                  .padStart(2, "0")}:${timeLeft.seconds.toString().padStart(2, "0")}`}
-              </span>
-            </AlertDescription>
-          </Alert>
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Event</span>
-              <span className="font-medium">{eventName}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Date</span>
-              <span>{eventDate.toLocaleDateString("id-ID")}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Quantity</span>
-              <span>{quantity} tickets</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Total Price</span>
-              <span className="font-semibold">{formatIDR(totalPrice)}</span>
-            </div>
-            
-            {availablePoints > 0 && (
-              <>
-                <div className="flex items-center space-x-2 py-2">
-                  <Checkbox
-                    id="usePoints"
-                    checked={usePoints}
-                    onCheckedChange={(checked) => setValue("usePoints", checked === true)}
-                  />
-                  <Label htmlFor="usePoints" className="text-sm cursor-pointer">
-                    Use my points ({formatIDR(availablePoints)} available)
-                  </Label>
-                </div>
-                
-                {usePoints && (
-                  <div className="flex justify-between items-center text-green-600">
-                    <span>Points used</span>
-                    <span>- {formatIDR(pointsToUse)}</span>
-                  </div>
-                )}
-                
-                {usePoints && (
-                  <div className="flex justify-between items-center font-bold">
-                    <span>Final Price</span>
-                    <span>{formatIDR(finalPrice)}</span>
-                  </div>
-                )}
-              </>
-            )}
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle>Payment Details</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-muted-foreground">Event</span>
+            <span className="font-medium">{eventName}</span>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-muted-foreground">Date</span>
+            <span>{eventDate.toLocaleDateString()}</span>
+          </div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-muted-foreground">Quantity</span>
+            <span>{quantity}</span>
+          </div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-muted-foreground">Subtotal</span>
+            <span>{formatIDR(totalPrice)}</span>
+          </div>
+        </div>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle>Contact Information</CardTitle>
-            <CardDescription>
-              Enter your details for the transaction
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <InputWithValidation
-              id="name"
-              label="Full Name"
-              placeholder="Enter your full name"
-              register={register}
-              errors={errors}
-              required
-            />
-            <InputWithValidation
-              id="email"
-              label="Email"
-              type="email"
-              placeholder="your.email@example.com"
-              register={register}
-              errors={errors}
-              required
-            />
-            <InputWithValidation
-              id="phone"
-              label="Phone Number"
-              placeholder="Enter your phone number"
-              register={register}
-              errors={errors}
-              required
-            />
-          </CardContent>
-        </Card>
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-md flex items-center gap-2">
+          <Clock className="h-4 w-4 text-orange-500" />
+          <div className="text-sm">
+            <p className="font-medium text-orange-700">Time remaining to upload payment:</p>
+            <p className="text-orange-600">{formatTime(countdown)}</p>
+          </div>
+        </div>
 
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle>Payment Proof</CardTitle>
-            <CardDescription>
-              Upload your payment proof to confirm your transaction
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-slate-50 p-4 rounded-lg flex items-center gap-3 mb-4">
-              <Info className="h-5 w-5 text-purple-600 flex-shrink-0" />
-              <div className="text-sm">
-                <p className="font-medium">Payment Instructions</p>
-                <p className="text-muted-foreground">
-                  Transfer the amount to our bank account: BCA 1234567890 (MeetNexus) and upload the payment receipt below.
-                </p>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {availablePoints > 0 && (
+              <FormField
+                control={form.control}
+                name="usePoints"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Use Points</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        You have {formatIDR(availablePoints)} points available
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <FormField
+              control={form.control}
+              name="voucherCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Voucher Code (Optional)</FormLabel>
+                  <FormControl>
+                    <div className="flex gap-2">
+                      <Input {...field} placeholder="Enter voucher code" />
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => {
+                          if (!field.value) {
+                            toast.error("Please enter a voucher code");
+                            return;
+                          }
+                          toast.error("Invalid voucher code", {
+                            description: "The voucher code you entered is invalid or has expired.",
+                          });
+                        }}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="paymentProof"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Proof*</FormLabel>
+                  <FormControl>
+                    <div className="flex flex-col gap-2">
+                      <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center cursor-pointer hover:bg-gray-50 transition">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          id="payment-proof"
+                          onChange={(e) => {
+                            handleFileChange(e);
+                            field.onChange(e);
+                          }}
+                        />
+                        <label 
+                          htmlFor="payment-proof" 
+                          className="cursor-pointer flex flex-col items-center"
+                        >
+                          <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-600 font-medium">
+                            {file ? file.name : "Click to upload or drag and drop"}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            PNG, JPG or JPEG (max. 5MB)
+                          </p>
+                        </label>
+                      </div>
+                      {file && (
+                        <div className="text-sm font-medium text-green-600 flex items-center gap-1">
+                          <span>✓</span> {file.name} uploaded
+                        </div>
+                      )}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Separator />
+
+            <div className="space-y-2">
+              {pointsToUse > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Points Used</span>
+                  <span className="text-sm font-medium text-green-600">
+                    - {formatIDR(pointsToUse)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center text-lg font-bold">
+                <span>Total</span>
+                <span>{formatIDR(finalPrice)}</span>
               </div>
             </div>
 
-            <div className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:bg-slate-50 transition-colors">
-              <input
-                type="file"
-                id="paymentProof"
-                className="hidden"
-                accept="image/*"
-                onChange={handleFileChange}
-              />
-              <label htmlFor="paymentProof" className="cursor-pointer block">
-                {paymentProofPreview ? (
-                  <div className="relative w-full aspect-video max-w-md mx-auto overflow-hidden rounded-md">
-                    <img
-                      src={paymentProofPreview}
-                      alt="Payment Proof Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="py-6">
-                    <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Click to upload payment proof
-                    </p>
-                  </div>
-                )}
-              </label>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-end gap-4">
-            <Button type="button" variant="outline">
-              Cancel
+            <Button type="submit" className="w-full" disabled={isUploading}>
+              {isUploading ? "Submitting..." : "Submit Payment"}
             </Button>
-            <Button type="submit" disabled={isSubmitting || !paymentProof}>
-              {isSubmitting ? "Processing..." : "Submit Payment"}
-            </Button>
-          </CardFooter>
-        </Card>
-      </form>
-    </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 }
